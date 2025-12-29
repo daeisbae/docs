@@ -23,8 +23,8 @@
             "group": "AWS Security",
             "icon": "shield-halved",
             "pages": [
-              "aws-security/iam-privilege-escalation",
-              "aws-security/open-repo-wiki-architecture"
+              "aws-security/IAM-Privilege-Escalation",
+              "aws-security/OpenRepoWiki-Security-Architecture"
             ]
           }
         ]
