@@ -39,27 +39,22 @@
     "dark": "/logo/dark.svg"
   },
   "navbar": {
-    "links": [
-      {
-        "label": "Contact",
-        "href": "mailto:daehyung.work@gmail.com"
-      }
-    ],
-    "primary": {
-      "type": "button",
-      "label": "GitHub",
-      "href": "https://github.com/daeisbae"
-    }
+
   },
   "contextual": {
     "options": [
      "copy",
      "view",
-     "cursor",
-     "vscode"
+     "chatgpt",
+     "claude",
+     "perplexity",
+     "mcp"
    ]
   },
   "footer": {
-    "socials": {}
+    "socials": {
+      "github": "https://github.com/daeisbae",
+      "linkedin": "http://linkedin.com/in/daehyung-kwak/"
+    }
   }
 }
