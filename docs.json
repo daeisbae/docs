@@ -22,13 +22,13 @@
           {
             "group": "AWS Security",
             "pages": [
-              "aws-security/iam-privilege-escalation"
+              "aws-security/IAM-Privilege-Escalation"
             ]
           },
           {
-            "group": "OpenRepoWiki",
+            "group": "AWS Security",
             "pages": [
-              "aws-security/openrepowiki_security"
+              "aws-security/OpenRepoWiki-Security-Architecture"
             ]
           }
         ]
