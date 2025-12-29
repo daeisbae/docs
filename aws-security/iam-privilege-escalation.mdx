@@ -1,0 +1,84 @@
+---
+title: 'IAM Privilege Escalation & Hardening'
+description: 'Analyzing common IAM misconfigurations and detection mechanisms.'
+icon: 'shield-halved'
+---
+
+## Overview
+
+This lab explores how subtle IAM misconfigurations can lead to full account compromise. I simulated an internal threat scenario where a user with limited permissions (`iam-service` or `hacker`) leverages specific policy combinations to escalate privileges to `AdministratorAccess`.
+
+The experiment covers four distinct escalation vectors and validates detection strategies using AWS native security tools.
+
+## Why this matters
+
+IAM is the perimeter in the cloud. Unlike traditional network security where a firewall breach is required, a single over-permissive IAM policy can allow an attacker (or compromised insider) to:
+1.  Move laterally across the account.
+2.  Exfiltrate sensitive data.
+3.  Establish persistence (backdoors).
+4.  Wipe infrastructure.
+
+Understanding these primitives is critical because they often bypass standard WAFs or network ACLs—they are "features" abused for malicious intent.
+
+## Key Concepts
+
+*   **Identity vs. Permission:** Authentication (Who are you?) vs. Authorization (What can you do?).
+*   **AssumeRole (`sts:AssumeRole`):** The mechanism to trade long-term credentials for temporary, privileged ones.
+*   **PassRole (`iam:PassRole`):** The ability to "give" a role to an AWS service (like EC2). This is effectively "becoming" that role.
+*   **Inline vs. Managed Policies:** Inline policies are embedded directly in a user/role, making them harder to audit centrally than managed policies.
+
+## Architecture & Attack Vectors
+
+### 1. The `sts:AssumeRole` Loophole
+**Scenario:** A user has permissions to edit their own policies (`iam:PutUserPolicy`) or a broad `sts:AssumeRole` permission.
+**The Exploit:** The user adds an inline policy allowing them to assume a high-privilege role (e.g., `AdminAccess`).
+**The Fix:** Enforce strict `Condition` keys in Trust Relationships (e.g., `aws:PrincipalArn`) so roles can only be assumed by specific, intended identities.
+
+### 2. EC2 `PassRole` Escalation
+**Scenario:** An attacker has `ec2:RunInstances` and `iam:PassRole`.
+**The Exploit:**
+1.  Launch an EC2 instance.
+2.  Pass a high-privilege IAM Role (e.g., Admin) to the EC2 instance during launch.
+3.  Shell into the instance (via SSH or Reverse Shell).
+4.  Query the Instance Metadata Service (IMDS) to steal the role's temporary credentials.
+
+```bash
+# Extracting credentials from IMDSv2
+TOKEN=$(curl -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")
+curl -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/iam/security-credentials/<TARGET_ROLE>
+```
+
+### 3. Shadow Admin via `iam:CreateAccessKey`
+**Scenario:** A user can run `iam:CreateAccessKey` on *other* users.
+**The Exploit:** Create a new access key for an existing Administrator user, then use those keys to authenticate as Admin.
+
+## Mistakes / Gotchas
+
+*   **Trusting "ReadOnly" users:** If a "ReadOnly" user has `iam:PassRole` or `iam:CreateAccessKey`, they are effectively Admins.
+*   **Ignoring Instance Metadata Service (IMDS):** Default EC2 settings often allow full access to IMDS. **Always enforce IMDSv2** with hop limits to prevent SSRF attacks from easily stealing credentials.
+*   **Over-indexing on "Full Access":** Creating a "Management Group" with `IAMFullAccess` is a bad practice. It allows users to modify their own permissions, bypassing separation of duties.
+
+## Detection & Mitigations
+
+Defense requires a multi-layered approach.
+
+### Logging (CloudTrail)
+CloudTrail is the source of truth. I configured it to log all write events.
+*   **Detection:** Searched for `EventName: SwitchRole` to see who assumed which role.
+*   **Insight:** The logs provide the source IP and User Agent, which is crucial for distinguishing between a legitimate console switch and a CLI script.
+
+### Compliance (AWS Config)
+Config continuously monitors resource states.
+*   **Action:** Enabled rules to flag users with attached inline policies (anti-pattern) and weak password policies.
+
+### Threat Detection (GuardDuty)
+GuardDuty analyzes VPC Flow Logs and CloudTrail events.
+*   **Findings:**
+    *   **Port Scanning:** Detected `nmap` scans originating from the compromised EC2 instance.
+    *   **Unusual API Calls:** Flagged API calls (like `iam:ListUsers`) originating from an EC2 instance that typically doesn't perform administrative tasks.
+
+## What I Learned
+
+1.  **Least Privilege is hard but necessary:** "Just give them Admin for now" creates a permanent backdoor.
+2.  **Permissions are transitive:** Access to `ec2:RunInstances` + `iam:PassRole` = Access to ANY role available to EC2.
+3.  **Detection latency:** GuardDuty is powerful, but it's not real-time prevention. By the time an alert fires, the data might already be exfiltrated. Preventive controls (SCPs, Permission Boundaries) are superior to detective controls.
