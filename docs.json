@@ -26,12 +26,9 @@
             ]
           },
           {
-            "group": "Meta / Reference",
+            "group": "OpenRepoWiki",
             "pages": [
-              "essentials/markdown",
-              "essentials/code",
-              "essentials/images",
-              "essentials/reusable-snippets"
+              "aws-security/openrepowiki_security"
             ]
           }
         ]
@@ -49,13 +46,13 @@
     "links": [
       {
         "label": "Contact",
-        "href": "mailto:user@example.com"
+        "href": "mailto:daehyung.work@gmail.com"
       }
     ],
     "primary": {
       "type": "button",
       "label": "GitHub",
-      "href": "https://github.com"
+      "href": "https://github.com/daeisbae"
     }
   },
   "contextual": {
