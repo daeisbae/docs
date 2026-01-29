@@ -19,7 +19,7 @@ For internal threats or compromised instances scanning outwards, we use GuardDut
 ## 2 Automation
 Next, we need to route these findings to our remediation logic. We use Amazon EventBridge to filter the noise and trigger our response workflow.
 
-### Eventbridge trigger pattern
+### 2.1 Eventbridge trigger pattern
 ```json
 {
   "source": ["aws.guardduty"],
@@ -38,13 +38,13 @@ Next, we need to route these findings to our remediation logic. We use Amazon Ev
 }
 ```
 
-## 2 Remediation
+## 3 Remediation
 GuardDuty findings are routed through EventBridge to trigger AWS Lambda, which updates AWS Network Firewall rules to block the offending source IP.
 
-### 2.1 Why not NACL?
+### 3.1 Why not NACL?
 NACLs have a hard limit on the number of rules of default 20!
 
-## 3 Conclusion
+## 4 Conclusion
 After writing this, I found this [aws security blog article](https://aws.amazon.com/blogs/security/automatically-block-suspicious-traffic-with-aws-network-firewall-and-amazon-guardduty/) which says the same thing....RIP
 
 # References
