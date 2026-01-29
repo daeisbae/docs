@@ -26,6 +26,13 @@
               "aws-security/IAM-Privilege-Escalation",
               "aws-security/OpenRepoWiki-Security-Architecture"
             ]
+          },
+          {
+            "group": "AWS Security Theory",
+            "icon": "shield-halved",
+            "pages": [
+              "aws-security-theory/nmap-auto-ban"
+            ]
           }
         ]
       }
