@@ -1,0 +1,173 @@
+Diagram:
+  DefinitionFiles:
+    - Type: URL
+      Url: https://raw.githubusercontent.com/awslabs/diagram-as-code/main/definitions/definition-for-aws-icons-light.yaml
+
+  Links:
+    - Source: GuardDuty
+      SourcePosition: S
+      Target: EventBridgeRule
+      TargetPosition: NNW
+      TargetArrowHead:
+        Type: Open
+      Type: orthogonal
+
+    - Source: SecurityHub
+      SourcePosition: S
+      Target: EventBridgeRule
+      TargetPosition: NNE
+      TargetArrowHead:
+        Type: Open
+      Type: orthogonal
+
+    - Source: EventBridgeRule
+      SourcePosition: S
+      Target: ResponderLambda
+      TargetPosition: N
+      TargetArrowHead:
+        Type: Open
+      Type: orthogonal
+
+    - Source: ResponderLambda
+      SourcePosition: W
+      Target: QuarantineSG
+      TargetPosition: E
+      TargetArrowHead:
+        Type: Open
+      Labels:
+        TargetRight:
+          Title: Attach quarantine SG
+      Type: orthogonal
+
+    - Source: QuarantineSG
+      SourcePosition: S
+      Target: CompromisedInstance
+      TargetPosition: N
+      LineStyle: dashed
+      TargetArrowHead:
+        Type: Open
+      Type: orthogonal
+
+    - Source: ResponderLambda
+      SourcePosition: E
+      Target: SSMRunbook
+      TargetPosition: W
+      TargetArrowHead:
+        Type: Open
+      Labels:
+        TargetRight:
+          Title: SSM isolate
+      Type: orthogonal
+
+    - Source: ResponderLambda
+      SourcePosition: SE
+      Target: ForensicsBucket
+      TargetPosition: W
+      TargetArrowHead:
+        Type: Open
+      Labels:
+        TargetRight:
+          Title: Snapshot & evidence
+      Type: orthogonal
+
+    - Source: ResponderLambda
+      SourcePosition: NE
+      Target: SnsTopic
+      TargetPosition: W
+      TargetArrowHead:
+        Type: Open
+      Labels:
+        TargetRight:
+          Title: Notify SOC
+      Type: orthogonal
+
+  Resources:
+    Canvas:
+      Type: AWS::Diagram::Canvas
+      Direction: vertical
+      Children:
+        - AWSCloud
+
+    AWSCloud:
+      Type: AWS::Diagram::Cloud
+      Preset: AWSCloudNoLogo
+      Direction: vertical
+      Children:
+        - ResponseFlow
+
+    ResponseFlow:
+      Type: AWS::Diagram::VerticalStack
+      Children:
+        - Detection
+        - EventBridgeRule
+        - Remediation
+
+    Detection:
+      Type: AWS::Diagram::HorizontalStack
+      Children:
+        - GuardDuty
+        - SecurityHub
+
+    GuardDuty:
+      Type: AWS::GuardDuty::Detector
+      Title: GuardDuty
+
+    SecurityHub:
+      Type: AWS::SecurityHub::Hub
+      Title: Security Hub
+
+    EventBridgeRule:
+      Type: AWS::Events::Rule
+      Title: EventBridge
+
+    Remediation:
+      Type: AWS::Diagram::HorizontalStack
+      Children:
+        - VPC
+        - ResponderLambda
+        - Ops
+
+    ResponderLambda:
+      Type: AWS::Lambda::Function
+      Title: Isolation Responder
+
+    VPC:
+      Type: AWS::EC2::VPC
+      Direction: vertical
+      Children:
+        - PrivateSubnet
+
+    PrivateSubnet:
+      Type: AWS::EC2::Subnet
+      Preset: PrivateSubnet
+      Direction: vertical
+      Children:
+        - QuarantineSG
+        - CompromisedInstance
+
+    CompromisedInstance:
+      Type: AWS::EC2::Instance
+      Title: Compromised EC2
+
+    QuarantineSG:
+      Type: AWS::EC2::SecurityGroup
+      Title: Quarantine SG
+
+    Ops:
+      Type: AWS::Diagram::VerticalStack
+      Children:
+        - SnsTopic
+        - SSMRunbook
+        - ForensicsBucket
+
+    SSMRunbook:
+      Type: AWS::SSM::Document
+      Title: SSM Runbook
+
+    ForensicsBucket:
+      Type: AWS::S3::Bucket
+      Title: S3
+
+    SnsTopic:
+      Type: AWS::SNS::Topic
+      Title: SNS Notification

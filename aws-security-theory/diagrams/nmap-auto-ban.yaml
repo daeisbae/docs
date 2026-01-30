@@ -1,0 +1,145 @@
+Diagram:
+  DefinitionFiles:
+    - Type: URL
+      Url: https://raw.githubusercontent.com/awslabs/diagram-as-code/main/definitions/definition-for-aws-icons-light.yaml
+
+  Links:
+    # Traffic path (example)
+    - Source: ExternalAttacker
+      Target: NetworkFirewall
+      SourcePosition: S
+      TargetPosition: N
+      TargetArrowHead:
+        Type: Open
+
+    - Source: NetworkFirewall
+      Target: ALB
+      SourcePosition: S
+      TargetPosition: N
+      TargetArrowHead:
+        Type: Open
+
+    - Source: ALB
+      Target: EC2
+      SourcePosition: E
+      TargetPosition: W
+      TargetArrowHead:
+        Type: Open
+
+    # # Detection pipeline
+    # - Source: EC2
+    #   Target: VPCFlowLogs
+    #   SourcePosition: E
+    #   TargetPosition: W
+    #   LineStyle: dashed
+
+    - Source: VPCFlowLogs
+      Target: GuardDuty
+      SourcePosition: S
+      TargetPosition: N
+      TargetArrowHead:
+        Type: Open
+
+    - Source: GuardDuty
+      Target: EventBridge
+      SourcePosition: S
+      TargetPosition: N
+      TargetArrowHead:
+        Type: Open
+
+    - Source: EventBridge
+      Target: Lambda
+      SourcePosition: S
+      TargetPosition: N
+      TargetArrowHead:
+        Type: Open
+
+    - Source: Lambda
+      Target: NetworkFirewall
+      SourcePosition: W
+      TargetPosition: E
+      Type: orthogonal
+      TargetArrowHead:
+        Type: Open
+
+  Resources:
+    Canvas:
+      Type: AWS::Diagram::Canvas
+      Direction: vertical
+      Children:
+        - ExternalAttacker
+        - AWSCloud
+
+    ExternalAttacker:
+      Type: AWS::Diagram::Resource
+      Preset: User
+      Title: External attacker
+
+    AWSCloud:
+      Type: AWS::Diagram::Cloud
+      Children:
+        - Flow
+
+    Flow:
+      Type: AWS::Diagram::HorizontalStack
+      Children:
+        - NetworkAndWorkloads
+        - DetectionAndResponse
+
+    NetworkAndWorkloads:
+      Type: AWS::EC2::VPC
+      Direction: vertical
+      Children:
+        - NetworkFirewall
+        - Subnets
+
+    NetworkFirewall:
+      Type: AWS::NetworkFirewall::Firewall
+      Title: AWS Firewall
+
+    Subnets:
+      Type: AWS::Diagram::HorizontalStack
+      Children:
+        - PublicSubnet
+        - PrivateSubnet
+
+    PublicSubnet:
+      Type: AWS::EC2::Subnet
+      Preset: PublicSubnet
+      Children:
+        - ALB
+
+    ALB:
+      Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+
+    PrivateSubnet:
+      Type: AWS::EC2::Subnet
+      Preset: PrivateSubnet
+      Direction: vertical
+      Children:
+        - EC2
+
+    EC2:
+      Type: AWS::EC2::Instance
+
+    VPCFlowLogs:
+      Type: AWS::EC2::FlowLog
+      Title: VPC Flow Logs
+
+    DetectionAndResponse:
+      Type: AWS::Diagram::VerticalStack
+      Children:
+        - VPCFlowLogs
+        - GuardDuty
+        - EventBridge
+        - Lambda
+
+    GuardDuty:
+      Type: AWS::GuardDuty::Detector
+
+    EventBridge:
+      Type: AWS::Events::Rule
+      Title: EventBridge
+
+    Lambda:
+      Type: AWS::Lambda::Function
