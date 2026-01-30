@@ -30,7 +30,8 @@
             "group": "AWS Security Theory",
             "icon": "shield-halved",
             "pages": [
-              "aws-security-theory/nmap-auto-ban"
+              "aws-security-theory/nmap-auto-ban",
+              "aws-security-theory/ec2-isolation-auto-response"
             ]
           }
         ]
