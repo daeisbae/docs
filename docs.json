@@ -33,6 +33,13 @@
               "aws-security-theory/nmap-auto-ban",
               "aws-security-theory/ec2-isolation-auto-response"
             ]
+          },
+          {
+            "group": "Security Operations",
+            "icon": "shield-halved",
+            "pages": [
+              "security-operations/phishing-detection-sentinel"
+            ]
           }
         ]
       }
@@ -45,18 +52,16 @@
     "light": "/logo/light.svg",
     "dark": "/logo/dark.svg"
   },
-  "navbar": {
-
-  },
+  "navbar": {},
   "contextual": {
     "options": [
-     "copy",
-     "view",
-     "chatgpt",
-     "claude",
-     "perplexity",
-     "mcp"
-   ]
+      "copy",
+      "view",
+      "chatgpt",
+      "claude",
+      "perplexity",
+      "mcp"
+    ]
   },
   "footer": {
     "socials": {
