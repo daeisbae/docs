@@ -38,6 +38,7 @@
             "group": "Security Operations",
             "icon": "shield-halved",
             "pages": [
+              "security-operations/flaw.cloud-cloudtrail-sentinel",
               "security-operations/phishing-detection-sentinel"
             ]
           }
