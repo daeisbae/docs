@@ -66,6 +66,29 @@
               "hackthebox-windows/hackthebox-remote",
               "hackthebox-windows/hackthebox-silo"
             ]
+          },
+          {
+            "group": "HackTheBox Linux",
+            "icon": "shield-halved",
+            "pages": [
+              "hackthebox-linux/hackthebox-bashed",
+              "hackthebox-linux/hackthebox-friendzone",
+              "hackthebox-linux/hackthebox-horizontall",
+              "hackthebox-linux/hackthebox-jarvis",
+              "hackthebox-linux/hackthebox-lame",
+              "hackthebox-linux/hackthebox-meta",
+              "hackthebox-linux/hackthebox-nibbles",
+              "hackthebox-linux/hackthebox-openadmin",
+              "hackthebox-linux/hackthebox-pandora",
+              "hackthebox-linux/hackthebox-paper",
+              "hackthebox-linux/hackthebox-poison",
+              "hackthebox-linux/hackthebox-previse",
+              "hackthebox-linux/hackthebox-ready",
+              "hackthebox-linux/hackthebox-sense",
+              "hackthebox-linux/hackthebox-shibboleth",
+              "hackthebox-linux/hackthebox-shocker",
+              "hackthebox-linux/hackthebox-writer"
+            ]
           }
         ]
       }

