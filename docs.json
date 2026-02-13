@@ -41,6 +41,14 @@
               "security-operations/flaw.cloud-cloudtrail-sentinel",
               "security-operations/phishing-detection-sentinel"
             ]
+          },
+          {
+            "group": "HackTheBox Active Directory",
+            "icon": "shield-halved",
+            "pages": [
+              "hackthebox-active-directory/hackthebox-active",
+              "hackthebox-active-directory/hackthebox-forest"
+            ]
           }
         ]
       }
