@@ -49,6 +49,23 @@
               "hackthebox-active-directory/hackthebox-active",
               "hackthebox-active-directory/hackthebox-forest"
             ]
+          },
+          {
+            "group": "HackTheBox Windows",
+            "icon": "shield-halved",
+            "pages": [
+              "hackthebox-windows/hackthebox-arctic",
+              "hackthebox-windows/hackthebox-bastion",
+              "hackthebox-windows/hackthebox-devel",
+              "hackthebox-windows/hackthebox-grandpa",
+              "hackthebox-windows/hackthebox-granny",
+              "hackthebox-windows/hackthebox-jerry",
+              "hackthebox-windows/hackthebox-legacy",
+              "hackthebox-windows/hackthebox-love",
+              "hackthebox-windows/hackthebox-optimum",
+              "hackthebox-windows/hackthebox-remote",
+              "hackthebox-windows/hackthebox-silo"
+            ]
           }
         ]
       }
